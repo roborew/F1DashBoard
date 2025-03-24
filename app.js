@@ -13,9 +13,9 @@ const viewer = new Cesium.Viewer("cesiumContainer", {
 
 // Shanghai International Circuit coordinates as origin point
 const SHANGHAI_COORDS = {
-  longitude: 121.219722,
-  latitude: 31.338889,
-  height: 100,
+  longitude: 121.218726,
+  latitude: 31.3388079,
+  height: 0,
 };
 
 const positionStart = Cesium.Cartesian3.fromDegrees(
@@ -25,8 +25,8 @@ const positionStart = Cesium.Cartesian3.fromDegrees(
 );
 
 const POSITION_OFFSET = {
-  longitude: 0.0025, // Adjust this value to move west (negative) or east (positive)
-  latitude: -0.0005, // Adjust this value to move south (negative) or north (positive)
+  longitude: 0.0035, // Adjust this value to move west (negative) or east (positive)
+  latitude: -0.0, // Adjust this value to move south (negative) or north (positive)
 };
 
 // Scale factor to convert OpenF1 coordinates to real-world distances (meters)
@@ -70,14 +70,10 @@ function convertToGeographic(x, y, z) {
 
 // Set the initial camera position to focus on Shanghai circuit
 viewer.camera.setView({
-  destination: Cesium.Cartesian3.fromDegrees(
-    SHANGHAI_COORDS.longitude,
-    SHANGHAI_COORDS.latitude,
-    2000
-  ),
+  destination: Cesium.Cartesian3.fromDegrees(0.0, 0.0, 25000000.0), // Centered at (0,0) with a high altitude
   orientation: {
     heading: 0.0,
-    pitch: -Cesium.Math.PI_OVER_FOUR,
+    pitch: -Cesium.Math.PI_OVER_TWO, // Look straight down
     roll: 0.0,
   },
 });
@@ -88,11 +84,11 @@ function focusOnShanghai() {
     destination: Cesium.Cartesian3.fromDegrees(
       SHANGHAI_COORDS.longitude,
       SHANGHAI_COORDS.latitude,
-      2000
+      2500
     ),
     orientation: {
       heading: 0.0,
-      pitch: -Cesium.Math.PI_OVER_FOUR,
+      pitch: -Cesium.Math.PI_OVER_TWO, // Look straight down
       roll: 0.0,
     },
   });
@@ -100,7 +96,7 @@ function focusOnShanghai() {
 
 // Create a variable to store the car entity reference
 let car;
-
+let currentYawAngle = 0;
 function createCarEntity(position) {
   car = viewer.entities.add({
     name: "F1 Car",
