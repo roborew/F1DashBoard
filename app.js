@@ -30,7 +30,17 @@ const POSITION_OFFSET = {
 };
 
 // Scale factor to convert OpenF1 coordinates to real-world distances (meters)
-const SCALE_FACTOR = 0.1; // This will need tuning based on actual track size
+const SCALE_FACTOR = 0.099; // This will need tuning based on actual track size
+
+// Global variable to store the previous geographic position
+let previousGeoPosition = null;
+
+// Global playback speed factor. Default is 1x (real time)
+let playbackSpeed = 1.0;
+
+let playbackStartTime = null;
+let startTimestamp = null;
+let currentIndex = 0;
 
 // Function to convert OpenF1 coordinates to geographic coordinates
 function convertToGeographic(x, y, z) {
@@ -104,8 +114,8 @@ function createCarEntity(position) {
     model: {
       uri: "objs/f1_car.glb",
       minimumPixelSize: 64,
-      maximumScale: 1000,
-      scale: 0.08,
+      maximumScale: 1,
+      scale: 0.01,
       heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
     },
   });
@@ -114,16 +124,50 @@ function createCarEntity(position) {
 
 // Update car position using OpenF1 coordinates
 function updateCarPositionFromOpenF1(x, y, z) {
-  if (!car) return;
-  console.log("x", x, "y", y, "z", z);
+  // Convert the OpenF1 coordinates to geographic coordinates
   const geoPosition = convertToGeographic(x, y, z);
-  const position = Cesium.Cartesian3.fromDegrees(
+
+  // Create a Cartesian3 position from the geographic position
+  const newPosition = Cesium.Cartesian3.fromDegrees(
     geoPosition.longitude,
     geoPosition.latitude,
     geoPosition.height
   );
-  console.log("position", position);
-  car.position = position;
+
+  // Update the car's position
+  car.position = newPosition;
+
+  // If we have a previous position, calculate the heading
+  if (previousGeoPosition) {
+    // Calculate differences (assumes small movements so simple subtraction works)
+    const dLon = Cesium.Math.toRadians(
+      geoPosition.longitude - previousGeoPosition.longitude
+    );
+    const dLat = Cesium.Math.toRadians(
+      geoPosition.latitude - previousGeoPosition.latitude
+    );
+
+    // Calculate heading: note the order in atan2 may need adjusting
+    // depending on your model's forward direction.
+    let heading = Math.atan2(dLon, dLat) + Math.PI;
+
+    // If your car model's forward (zero rotation) isn't aligned with north,
+    // you might need to add a constant offset, for example Math.PI/2
+    // heading += Math.PI / 2;
+
+    // Create a quaternion that represents the new orientation using the computed heading.
+    // Since it's a flat plane, pitch and roll stay 0.
+    const newOrientation = Cesium.Transforms.headingPitchRollQuaternion(
+      newPosition,
+      new Cesium.HeadingPitchRoll(heading, 0, 0)
+    );
+
+    // Update the car's orientation
+    car.orientation = newOrientation;
+  }
+
+  // Store the current geographic position for the next update
+  previousGeoPosition = geoPosition;
 }
 
 // Create initial car entity
@@ -141,27 +185,56 @@ async function loadRaceData() {
   }
 }
 
-let currentIndex = 0;
-
-// Initialize the data
-async function initialize() {
+// Assume raceData is already loaded (or defined globally) and sorted by date asc
+async function startRacePlayback() {
   raceData = await loadRaceData();
-  if (raceData.length > 0) {
-    // Start the position updates once data is loaded
-    startPositionUpdates(raceData);
+  if (raceData.length === 0) {
+    console.error("No race data loaded");
+    return;
+  }
+  // Use the earliest timestamp as the race start (in milliseconds)
+  startTimestamp = Date.parse(raceData[0].date);
+  playbackStartTime = Date.now();
+  currentIndex = 0;
+  // Start the Playback Loop
+  requestAnimationFrame(updatePlayback);
+}
+
+function updatePlayback() {
+  // Multiply elapsed time by playbackSpeed to accelerate the virtual clock
+  const elapsed = (Date.now() - playbackStartTime) * playbackSpeed;
+  const currentVirtualTime = startTimestamp + elapsed;
+
+  // Process race records with timestamps <= currentVirtualTime
+  while (
+    currentIndex < raceData.length &&
+    Date.parse(raceData[currentIndex].date) <= currentVirtualTime
+  ) {
+    const record = raceData[currentIndex];
+    updateCarPositionFromOpenF1(record.x, record.y, record.z);
+    currentIndex++;
+  }
+
+  // Request next frame if there is data to process
+  if (currentIndex < raceData.length) {
+    requestAnimationFrame(updatePlayback);
+  } else {
+    console.log("Race playback finished.");
   }
 }
 
-function startPositionUpdates(raceData) {
-  setInterval(() => {
-    if (currentIndex >= raceData.length) {
-      currentIndex = 0; // Loop back to start
-    }
-    const position = raceData[currentIndex];
-    updateCarPositionFromOpenF1(position.x, position.y, position.z);
-    currentIndex++;
-  }, 100); // Update every 100ms
+// Setup event listeners for playback speed buttons
+function setupPlaybackControls() {
+  const buttons = document.querySelectorAll(".playback-btn");
+  buttons.forEach((button) => {
+    button.addEventListener("click", () => {
+      // Get the desired speed from the data-speed attribute and update the playback factor
+      playbackSpeed = parseFloat(button.dataset.speed);
+      console.log("Playback speed set to x" + playbackSpeed);
+    });
+  });
 }
 
-// Start the initialization
-initialize();
+// Initialize the playback
+setupPlaybackControls();
+startRacePlayback();

@@ -22,4 +22,33 @@ html, body {
     background: rgba(255, 255, 255, 0.8);
     padding: 10px;
     border-radius: 4px;
+}
+
+#playback-controls {
+    position: absolute;
+    top: 10px;
+    left: 300px;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 10px;
+    border-radius: 4px;
+    display: flex;
+    gap: 5px;
+}
+
+.playback-btn {
+    padding: 5px 10px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.playback-btn:hover {
+    background: #2980b9;
+}
+
+.playback-btn.active {
+    background: #e74c3c;
 } 
